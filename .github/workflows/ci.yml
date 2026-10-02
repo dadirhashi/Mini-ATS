@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [staging, main]
+  pull_request:
+    branches: [staging, main]
+
+# Avbryt äldre körningar på samma gren när en ny push kommer
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Minsta möjliga rättigheter: workflowet får bara läsa koden
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Lint & build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Platshållare: bygget behöver variablerna men pratar aldrig med Supabase.
+      # Riktiga värden finns bara i .env.local och senare i Vercel.
+      NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-key
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - name: Hämta koden
+        uses: actions/checkout@v5
+
+      - name: Installera Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Installera paket
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typkontroll och bygge
+        run: npm run build
