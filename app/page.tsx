@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { logout } from "./login/actions";
 
@@ -25,6 +26,12 @@ export default async function Home() {
           Inloggad som <strong>{profile.email}</strong> med rollen{" "}
           <strong>{profile.role}</strong>
         </p>
+      )}
+
+      {profile?.role === "admin" && (
+        <Link href="/admin/users" className="inline-block underline">
+          Hantera konton →
+        </Link>
       )}
 
       <form action={logout}>
