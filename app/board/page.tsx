@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import AppHeader from "@/components/app-header";
-import Board, { type BoardCandidate } from "./board";
+import Board, { type BoardCandidate, type BoardJob } from "./board";
 
 export default async function BoardPage() {
   const supabase = await createClient();
@@ -16,6 +16,13 @@ export default async function BoardPage() {
     .order("position", { ascending: true })
     .overrideTypes<BoardCandidate[], { merge: false }>();
 
+  // Alla jobb man har åtkomst till, till filtret (även jobb utan kandidater).
+  const { data: jobs } = await supabase
+    .from("jobs")
+    .select("id, title, customer:profiles!jobs_customer_id_fkey(full_name, company_name)")
+    .order("title")
+    .overrideTypes<BoardJob[], { merge: false }>();
+
   return (
     <>
       <AppHeader />
@@ -25,7 +32,7 @@ export default async function BoardPage() {
         {error ? (
           <p className="text-sm text-red-600">Kunde inte hämta kandidaterna.</p>
         ) : (
-          <Board candidates={candidates ?? []} showCustomer={!!isAdmin} />
+          <Board candidates={candidates ?? []} jobs={jobs ?? []} showCustomer={!!isAdmin} />
         )}
       </main>
     </>
