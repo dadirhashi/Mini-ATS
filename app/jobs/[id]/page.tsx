@@ -62,9 +62,17 @@ export default async function JobDetailPage({
       <AppHeader />
       <main className="mx-auto max-w-6xl p-4 sm:p-8 space-y-8 text-gray-900">
         <div className="space-y-2">
-          <Link href="/jobs" className="text-sm text-gray-600 hover:underline">
-            ← Alla jobb
-          </Link>
+         <div className="flex items-center justify-between gap-4">
+            <Link href="/jobs" className="text-sm text-gray-600 hover:underline">
+             ← Alla jobb
+            </Link>
+            <Link
+             href={`/board?job=${job.id}`}
+              className="text-sm font-medium text-gray-900 hover:underline"
+            >
+              Visa på kanban →
+            </Link>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-semibold">{job.title}</h1>
             <span
