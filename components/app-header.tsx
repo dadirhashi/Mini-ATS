@@ -27,6 +27,9 @@ export default async function AppHeader() {
           <Link href="/jobs" className="text-gray-600 hover:text-gray-900">
             Jobb
           </Link>
+          <Link href="/board" className="text-gray-600 hover:text-gray-900">
+            Kanban
+          </Link>
           {isAdmin && (
             <Link href="/admin/users" className="text-gray-600 hover:text-gray-900">
               Konton
