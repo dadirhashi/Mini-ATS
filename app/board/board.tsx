@@ -56,15 +56,17 @@ export default function Board({
   candidates,
   jobs,
   showCustomer,
+  initialJobId = "",
 }: {
   candidates: BoardCandidate[];
   jobs: BoardJob[];
   showCustomer: boolean;
+  initialJobId?: string;
 }) {
   // Lokal kopia av korten. Ändras direkt vid släpp (optimistiskt) och
   // återställs om servern säger nej.
   const [items, setItems] = useState(candidates);
-  const [jobId, setJobId] = useState(""); // "" = alla jobb
+  const [jobId, setJobId] = useState(initialJobId); // "" = alla jobb
   const [query, setQuery] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

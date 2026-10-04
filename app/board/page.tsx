@@ -2,7 +2,13 @@ import { createClient } from "@/lib/supabase/server";
 import AppHeader from "@/components/app-header";
 import Board, { type BoardCandidate, type BoardJob } from "./board";
 
-export default async function BoardPage() {
+// ?job=<id> i adressen förväljer jobbet i filtret (länk från jobbsidan).
+export default async function BoardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ job?: string }>;
+}) {
+  const { job: jobParam } = await searchParams;
   const supabase = await createClient();
   const { data: isAdmin } = await supabase.rpc("is_admin");
 
@@ -32,7 +38,13 @@ export default async function BoardPage() {
         {error ? (
           <p className="text-sm text-red-600">Kunde inte hämta kandidaterna.</p>
         ) : (
-          <Board candidates={candidates ?? []} jobs={jobs ?? []} showCustomer={!!isAdmin} />
+          <Board
+            candidates={candidates ?? []}
+            jobs={jobs ?? []}
+            showCustomer={!!isAdmin}
+            // Bara ett jobb man faktiskt har åtkomst till kan förväljas.
+            initialJobId={jobs?.some((j) => j.id === jobParam) ? jobParam : ""}
+          />
         )}
       </main>
     </>
