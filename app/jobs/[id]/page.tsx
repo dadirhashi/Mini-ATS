@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AppHeader from "@/components/app-header";
+import Collapsible from "@/components/collapsible";
 import {
   STAGE_COLORS,
   STAGE_LABELS,
@@ -112,10 +113,9 @@ export default async function JobDetailPage({
 
         <EditJobForm job={job} />
 
-        <section className="space-y-3">
-          <h2 className="text-lg font-medium">Lägg till kandidat</h2>
+        <Collapsible title="Lägg till kandidat" defaultOpen={(candidates?.length ?? 0) === 0}>
           <CreateCandidateForm jobId={job.id} />
-        </section>
+        </Collapsible>
 
         <section className="space-y-3">
           <h2 className="text-lg font-medium">Kandidater ({candidates?.length ?? 0})</h2>
