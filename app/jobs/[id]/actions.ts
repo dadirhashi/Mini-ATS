@@ -5,13 +5,26 @@ import { createClient } from "@/lib/supabase/server";
 import { isValidEmail, normalizeLinkedIn } from "@/lib/candidates";
 import { MAX_PDF_BYTES, pdfToText } from "@/lib/pdf";
 
-export type CandidateFormState = { error?: string; success?: string } | undefined;
+export type FormState = { error?: string; success?: string } | undefined;
+// Äldre namn som formulären importerar.
+export type CandidateFormState = FormState;
+export type AssessState = FormState;
 
-export async function createCandidate(
-  _prev: CandidateFormState,
-  formData: FormData
-): Promise<CandidateFormState> {
-  const jobId = String(formData.get("job_id") ?? "");
+type CandidateFields = {
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  linkedin_url: string | null;
+  cv_text: string | null;
+};
+
+// Läser och validerar kandidatformuläret. Används av både "lägg till" och "redigera".
+// Vid "lägg till" kombineras inklistrad text och PDF. Vid "redigera" ersätter en ny
+// PDF texten (annars skulle den gamla CV-texten finnas med två gånger).
+async function readCandidateForm(
+  formData: FormData,
+  mode: "create" | "edit"
+): Promise<{ fields: CandidateFields } | { error: string }> {
   const fullName = String(formData.get("full_name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
@@ -19,14 +32,11 @@ export async function createCandidate(
   const cvFile = formData.get("cv_file");
   const linkedin = normalizeLinkedIn(String(formData.get("linkedin_url") ?? ""));
 
-  if (!jobId) return { error: "Jobb saknas." };
   if (!fullName) return { error: "Namn krävs." };
   if (fullName.length > 200) return { error: "Namnet får vara max 200 tecken." };
   if (email && !isValidEmail(email)) return { error: "Ogiltig e-postadress." };
   if (linkedin.error) return { error: linkedin.error };
 
-  
-  // CV som PDF: läs ut texten. Inklistrad text och PDF kan kombineras.
   let pdfText = "";
   if (cvFile instanceof File && cvFile.size > 0) {
     const isPdf = cvFile.type === "application/pdf" || cvFile.name.toLowerCase().endsWith(".pdf");
@@ -45,19 +55,35 @@ export async function createCandidate(
       };
     }
   }
-  const cvText = [pastedCv, pdfText].filter(Boolean).join("\n\n");
+
+  const cvText =
+    mode === "edit" && pdfText ? pdfText : [pastedCv, pdfText].filter(Boolean).join("\n\n");
+
+  return {
+    fields: {
+      full_name: fullName,
+      email: email || null,
+      phone: phone || null,
+      linkedin_url: linkedin.url,
+      cv_text: cvText || null,
+    },
+  };
+}
+
+export async function createCandidate(_prev: FormState, formData: FormData): Promise<FormState> {
+  const jobId = String(formData.get("job_id") ?? "");
+  if (!jobId) return { error: "Jobb saknas." };
+
+  const parsed = await readCandidateForm(formData, "create");
+  if ("error" in parsed) return { error: parsed.error };
 
   const supabase = await createClient();
 
   // RLS (can_access_job) avgör om man får lägga kandidater på jobbet:
   // kunden bara på egna jobb, admin på alla.
   const { error } = await supabase.from("candidates").insert({
+    ...parsed.fields,
     job_id: jobId,
-    full_name: fullName,
-    email: email || null,
-    phone: phone || null,
-    linkedin_url: linkedin.url,
-    cv_text: cvText || null,
     // Nya kandidater hamnar sist i kolumnen "Ansökt" på kanban-tavlan.
     position: Date.now(),
   });
@@ -70,7 +96,33 @@ export async function createCandidate(
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/jobs"); // antal kandidater på jobbkortet
-  return { success: `${fullName} lades till.` };
+  return { success: `${parsed.fields.full_name} lades till.` };
+}
+
+export async function updateCandidate(_prev: FormState, formData: FormData): Promise<FormState> {
+  const id = String(formData.get("id") ?? "");
+  const jobId = String(formData.get("job_id") ?? "");
+  if (!id) return { error: "Kandidat saknas." };
+
+  const parsed = await readCandidateForm(formData, "edit");
+  if ("error" in parsed) return { error: parsed.error };
+
+  const supabase = await createClient();
+  // RLS avgör åtkomsten. Påverkas 0 rader saknas behörighet (eller kandidaten finns inte).
+  const { data, error } = await supabase
+    .from("candidates")
+    .update(parsed.fields)
+    .eq("id", id)
+    .select("id");
+
+  if (error || !data?.length) {
+    if (error) console.error("updateCandidate:", error.code, error.message);
+    return { error: "Kunde inte spara ändringarna." };
+  }
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath("/board");
+  return { success: "Sparat." };
 }
 
 export async function deleteCandidate(formData: FormData) {
@@ -88,15 +140,39 @@ export async function deleteCandidate(formData: FormData) {
   revalidatePath("/jobs");
 }
 
+export async function updateJob(_prev: FormState, formData: FormData): Promise<FormState> {
+  const id = String(formData.get("id") ?? "");
+  const title = String(formData.get("title") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const status = String(formData.get("status") ?? "");
 
-export type AssessState = { error?: string; success?: string } | undefined;
+  if (!id) return { error: "Jobb saknas." };
+  if (!title) return { error: "Titel krävs." };
+  if (title.length > 200) return { error: "Titeln får vara max 200 tecken." };
+  if (status !== "open" && status !== "closed") return { error: "Ogiltig status." };
+
+  const supabase = await createClient();
+  // RLS: kunden kan bara ändra egna jobb, admin alla.
+  const { data, error } = await supabase
+    .from("jobs")
+    .update({ title, description, status })
+    .eq("id", id)
+    .select("id");
+
+  if (error || !data?.length) {
+    if (error) console.error("updateJob:", error.code, error.message);
+    return { error: "Kunde inte spara jobbet." };
+  }
+
+  revalidatePath(`/jobs/${id}`);
+  revalidatePath("/jobs");
+  revalidatePath("/board");
+  return { success: "Jobbet sparades." };
+}
 
 // Ber Edge Function assess-cv att AI-bedöma kandidatens CV mot jobbet.
 // Funktionen kontrollerar själv att användaren har åtkomst till kandidaten.
-export async function assessCandidate(
-  _prev: AssessState,
-  formData: FormData
-): Promise<AssessState> {
+export async function assessCandidate(_prev: FormState, formData: FormData): Promise<FormState> {
   const id = String(formData.get("id") ?? "");
   const jobId = String(formData.get("job_id") ?? "");
   if (!id) return { error: "Kandidat saknas." };
