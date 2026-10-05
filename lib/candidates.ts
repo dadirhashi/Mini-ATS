@@ -54,3 +54,20 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function isValidEmail(value: string) {
   return EMAIL_RE.test(value);
 }
+
+
+// AI-bedömning som Edge Function assess-cv sparar i candidates.ai_assessment.
+export type AiAssessment = {
+  score: number; // 1–10
+  summary: string;
+  strengths: string[];
+  gaps: string[];
+  model?: string;
+};
+
+// Färg på betygsmärket: grönt = stark matchning, gult = mellan, rött = svag.
+export function scoreColor(score: number) {
+  if (score >= 8) return "bg-green-100 text-green-800";
+  if (score >= 5) return "bg-yellow-100 text-yellow-800";
+  return "bg-red-100 text-red-800";
+}
