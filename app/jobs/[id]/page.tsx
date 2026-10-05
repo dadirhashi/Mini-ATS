@@ -2,9 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AppHeader from "@/components/app-header";
-import { STAGE_COLORS, STAGE_LABELS, type Stage } from "@/lib/candidates";
+import {
+  STAGE_COLORS,
+  STAGE_LABELS,
+  scoreColor,
+  type AiAssessment,
+  type Stage,
+} from "@/lib/candidates";
 import CreateCandidateForm from "./create-candidate-form";
 import DeleteCandidateButton from "./delete-candidate-button";
+import AssessButton from "./assess-button";
 
 type JobDetail = {
   id: string;
@@ -23,6 +30,8 @@ type CandidateRow = {
   cv_text: string | null;
   stage: Stage;
   created_at: string;
+  ai_assessment: AiAssessment | null;
+  ai_assessed_at: string | null;
 };
 
 // [id] i mappnamnet gör att sidan svarar på /jobs/<vilket id som helst>.
@@ -52,7 +61,9 @@ export default async function JobDetailPage({
 
   const { data: candidates, error } = await supabase
     .from("candidates")
-    .select("id, full_name, email, phone, linkedin_url, cv_text, stage, created_at")
+    .select(
+      "id, full_name, email, phone, linkedin_url, cv_text, stage, created_at, ai_assessment, ai_assessed_at"
+    )
     .eq("job_id", job.id)
     .order("created_at", { ascending: false })
     .overrideTypes<CandidateRow[], { merge: false }>();
@@ -62,12 +73,12 @@ export default async function JobDetailPage({
       <AppHeader />
       <main className="mx-auto max-w-6xl p-4 sm:p-8 space-y-8 text-gray-900">
         <div className="space-y-2">
-         <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center justify-between gap-4">
             <Link href="/jobs" className="text-sm text-gray-600 hover:underline">
-             ← Alla jobb
+              ← Alla jobb
             </Link>
             <Link
-             href={`/board?job=${job.id}`}
+              href={`/board?job=${job.id}`}
               className="text-sm font-medium text-gray-900 hover:underline"
             >
               Visa på kanban →
@@ -159,6 +170,55 @@ export default async function JobDetailPage({
                       </p>
                     </details>
                   )}
+
+                  {c.ai_assessment && (
+                    <div className="rounded-lg bg-gray-50 p-3 space-y-2 text-sm">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${scoreColor(c.ai_assessment.score)}`}
+                        >
+                          AI-matchning {c.ai_assessment.score}/10
+                        </span>
+                        {c.ai_assessed_at && (
+                          <span className="text-xs text-gray-400">
+                            {new Date(c.ai_assessed_at).toLocaleDateString("sv-SE")}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-gray-700">{c.ai_assessment.summary}</p>
+                      <details>
+                        <summary className="cursor-pointer text-gray-700">Styrkor och luckor</summary>
+                        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <p className="text-xs font-medium text-green-800">Styrkor</p>
+                            <ul className="list-disc pl-4 text-gray-600">
+                              {c.ai_assessment.strengths.map((s, i) => (
+                                <li key={i}>{s}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-red-800">Luckor / att fråga om</p>
+                            <ul className="list-disc pl-4 text-gray-600">
+                              {c.ai_assessment.gaps.map((g, i) => (
+                                <li key={i}>{g}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </details>
+                      <p className="text-xs text-gray-400">
+                        Stöd för beslut – inte ett beslut. Läs alltid CV:t själv.
+                      </p>
+                    </div>
+                  )}
+
+                  <AssessButton
+                    id={c.id}
+                    jobId={job.id}
+                    hasCv={!!c.cv_text}
+                    assessed={!!c.ai_assessment}
+                  />
 
                   <div className="flex items-center justify-between pt-2">
                     <span className="text-xs text-gray-400">
