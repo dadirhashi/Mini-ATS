@@ -251,7 +251,7 @@ export default function Board({
           value={jobId}
           onChange={(e) => setJobId(e.target.value)}
           aria-label="Filtrera på jobb"
-          className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+           className="w-full sm:w-64 truncate rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
         >
           <option value="">Alla jobb</option>
           {jobs.map((j) => (
@@ -267,7 +267,7 @@ export default function Board({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Sök kandidat…"
           aria-label="Sök på kandidatnamn"
-          className="w-56 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+          className="w-full sm:w-56 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
         />
 
         <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -320,8 +320,9 @@ export default function Board({
         onDragEnd={handleDragEnd}
         onDragCancel={() => setActiveId(null)}
       >
-        {/* Sex kolumner bredvid varandra. På smal skärm scrollar man i sidled. */}
-        <div className="flex gap-3 overflow-x-auto pb-4">
+           {/* Kolumnerna anpassar sig efter skärmen i stället för att scrolla i sidled:
+            mobil 1 per rad, surfplatta 2, liten dator 3, stor skärm alla 6 bredvid varandra. */}
+        <div className="grid gap-3 pb-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           {STAGES.map((stage) => (
             <Column key={stage} stage={stage} count={visible.filter((c) => c.stage === stage).length}>
               {visible
@@ -360,7 +361,7 @@ function Column({
   return (
     <section
       ref={setNodeRef}
-      className={`w-56 shrink-0 rounded-xl p-2 pb-8 flex flex-col gap-2 min-h-40 transition-colors ${
+            className={`min-w-0 rounded-xl p-2 pb-6 flex flex-col gap-2 min-h-20 sm:min-h-40 transition-colors ${
         isOver ? "bg-blue-100" : "bg-gray-200/60"
       }`}
     >
