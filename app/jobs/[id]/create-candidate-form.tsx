@@ -46,15 +46,27 @@ export default function CreateCandidateForm({ jobId }: { jobId: string }) {
         />
       </label>
 
-      <label className="block">
-        <span className="text-sm font-medium">CV</span>
-        <textarea
-          name="cv_text"
-          rows={5}
-          placeholder="Klistra in CV-texten här. Används av AI-bedömningen."
-          className={input}
-        />
-      </label>
+      <fieldset className="grid gap-3">
+        <legend className="text-sm font-medium">CV</legend>
+        <label className="block">
+          <span className="text-xs text-gray-600">Ladda upp PDF (max 4 MB)</span>
+          <input
+            name="cv_file"
+            type="file"
+            accept="application/pdf,.pdf"
+            className="mt-1 block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-gray-900 file:px-3 file:py-2 file:text-white hover:file:bg-gray-700"
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs text-gray-600">… och/eller klistra in texten</span>
+          <textarea
+            name="cv_text"
+            rows={5}
+            placeholder="Klistra in CV-texten här. Används av AI-bedömningen."
+            className={input}
+          />
+        </label>
+      </fieldset>
 
       <div className="flex items-center gap-4">
         <button
