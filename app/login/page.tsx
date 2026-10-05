@@ -12,7 +12,7 @@ export default function LoginPage() {
         action={formAction}
         className="w-full max-w-sm bg-white text-gray-900 rounded-xl shadow p-8 space-y-4"
       >
-        <h1 className="text-2xl font-semibold">Mini-ATS</h1>
+        <h1 className="text-2xl font-semibold">ATS</h1>
         <p className="text-sm text-gray-500">Logga in för att fortsätta</p>
 
         <label className="block">
