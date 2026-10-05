@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import {
   DndContext,
@@ -18,7 +18,8 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { STAGES, STAGE_COLORS, STAGE_LABELS, type Stage } from "@/lib/candidates";
+import { STAGES, STAGE_COLORS, STAGE_LABELS, scoreColor, type Stage } from "@/lib/candidates";
+import { createClient } from "@/lib/supabase/client";
 import { moveCandidate } from "./actions";
 
 type Customer = { full_name: string; company_name: string | null } | null;
@@ -28,13 +29,27 @@ export type BoardCandidate = {
   full_name: string;
   stage: Stage;
   position: number;
+  ai_score: number | null; // AI-betyg 1–10, null om inte bedömd
   job: { id: string; title: string; customer: Customer };
 };
 
 export type BoardJob = { id: string; title: string; customer: Customer };
 
+// En rad som den ser ut i databasen, så som Realtime skickar den.
+type CandidateRow = {
+  id: string;
+  job_id: string;
+  full_name: string;
+  stage: Stage;
+  position: number;
+  ai_assessment: { score?: number } | null;
+};
+
 const customerName = (c: Customer) => (c ? c.company_name || c.full_name : "");
 const byPosition = (a: BoardCandidate, b: BoardCandidate) => a.position - b.position;
+// Högst betyg först; obedömda sist, i sin vanliga ordning.
+const byScore = (a: BoardCandidate, b: BoardCandidate) =>
+  (b.ai_score ?? -1) - (a.ai_score ?? -1) || byPosition(a, b);
 
 // Släpp-mål har prefix så att vi vet om kortet släpptes på en kolumn eller på
 // ett annat kort: "col:interview" eller "card:<kandidat-id>".
@@ -68,8 +83,71 @@ export default function Board({
   const [items, setItems] = useState(candidates);
   const [jobId, setJobId] = useState(initialJobId); // "" = alla jobb
   const [query, setQuery] = useState("");
+  const [sortByScore, setSortByScore] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [live, setLive] = useState(false);
+
+  // Jobblistan behövs för att visa nya kandidater (Realtime skickar bara job_id).
+  // Ref i stället för beroende, så att prenumerationen inte startas om i onödan.
+  const jobsRef = useRef(jobs);
+  useEffect(() => {
+    jobsRef.current = jobs;
+  }, [jobs]);
+
+  // Realtid: lyssna på ändringar i candidates. Supabase skickar bara rader som
+  // användaren får läsa enligt RLS, så en kund ser aldrig andra kunders kort.
+  useEffect(() => {
+    const supabase = createClient();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    (async () => {
+      // Koppla inloggningen till realtid INNAN vi ansluter. Annars räknas vi som
+      // anonyma och RLS släpper inte igenom några händelser.
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (data.session) await supabase.realtime.setAuth(data.session.access_token);
+
+      channel = supabase
+        .channel("board-candidates")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "candidates" },
+          (payload) => {
+            if (payload.eventType === "DELETE") {
+              const id = (payload.old as { id?: string }).id;
+              setItems((cur) => cur.filter((c) => c.id !== id));
+              return;
+            }
+            const row = payload.new as CandidateRow;
+            setItems((cur) => {
+              const existing = cur.find((c) => c.id === row.id);
+              const job =
+                existing && existing.job.id === row.job_id
+                  ? existing.job
+                  : jobsRef.current.find((j) => j.id === row.job_id);
+              if (!job) return cur; // jobb som inte finns i listan än – syns efter omladdning
+              const updated: BoardCandidate = {
+                id: row.id,
+                full_name: row.full_name,
+                stage: row.stage,
+                position: row.position,
+                ai_score: row.ai_assessment?.score ?? null,
+                job,
+              };
+              return [...cur.filter((c) => c.id !== row.id), updated].sort(byPosition);
+            });
+          }
+        )
+        .subscribe((status) => setLive(status === "SUBSCRIBED"));
+    })();
+
+    return () => {
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, []);
 
   // Fast id förhindrar varningar om olika id mellan server och webbläsare.
   const dndId = useId();
@@ -94,9 +172,9 @@ export default function Board({
   }
 
   const q = query.trim().toLowerCase();
-  const visible = items.filter(
-    (c) => (!jobId || c.job.id === jobId) && (!q || c.full_name.toLowerCase().includes(q))
-  );
+  const visible = items
+    .filter((c) => (!jobId || c.job.id === jobId) && (!q || c.full_name.toLowerCase().includes(q)))
+    .sort(sortByScore ? byScore : byPosition);
   const isFiltered = jobId !== "" || q !== "";
   const activeCard = activeId ? items.find((c) => c.id === activeId) : undefined;
 
@@ -122,8 +200,10 @@ export default function Board({
       const target = items.find((c) => c.id === overId.slice(CARD.length));
       if (!target || target.id === movingId) return;
       stage = target.stage;
-      beforeId = target.id;
+      // Sorterat på AI-betyg styr betyget ordningen, så kortet läggs bara i kolumnen.
+      beforeId = sortByScore ? null : target.id;
     }
+    if (sortByScore && moving.stage === stage) return; // ordningen styrs av betyget
 
     // 2. Räkna ut ny position: mitt emellan grannarna. Då behöver inga andra
     //    kort numreras om – bara det flyttade kortet sparas.
@@ -189,6 +269,24 @@ export default function Board({
           aria-label="Sök på kandidatnamn"
           className="w-56 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
         />
+
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={sortByScore}
+            onChange={(e) => setSortByScore(e.target.checked)}
+            className="h-4 w-4"
+          />
+          Sortera på AI-betyg
+        </label>
+
+        <span
+          title={live ? "Ändringar från andra syns direkt" : "Ansluter till realtid…"}
+          className={`ml-auto flex items-center gap-1.5 text-xs ${live ? "text-green-700" : "text-gray-400"}`}
+        >
+          <span className={`h-2 w-2 rounded-full ${live ? "bg-green-500" : "bg-gray-300"}`} />
+          {live ? "Live" : "Ansluter…"}
+        </span>
 
         {isFiltered && (
           <>
@@ -321,7 +419,17 @@ function CardBody({
         dragging ? "shadow-lg rotate-2 cursor-grabbing" : "shadow-sm"
       }`}
     >
-      <p className="font-medium leading-tight">{c.full_name}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-medium leading-tight">{c.full_name}</p>
+        {c.ai_score != null && (
+          <span
+            title="AI-matchning mot jobbet"
+            className={`shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${scoreColor(c.ai_score)}`}
+          >
+            {c.ai_score}/10
+          </span>
+        )}
+      </div>
       <Link
         href={`/jobs/${c.job.id}`}
         className="block text-xs text-gray-500 hover:underline truncate"

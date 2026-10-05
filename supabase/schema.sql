@@ -139,6 +139,30 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
+
+
+-- 4c. Nollställ AI-bedömningen när CV-texten ändras, så att ett gammalt betyg
+--     aldrig visas för ett nytt CV. Körs bara när cv_text finns med i UPDATE
+--     och bara om texten faktiskt ändrats (flytt på kanban påverkar inte).
+create or replace function public.reset_ai_assessment_on_cv_change()
+returns trigger
+language plpgsql set search_path = ''
+as $$
+begin
+  if new.cv_text is distinct from old.cv_text then
+    new.ai_assessment := null;
+    new.ai_assessed_at := null;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger candidates_reset_ai_on_cv_change
+  before update of cv_text on public.candidates
+  for each row execute function public.reset_ai_assessment_on_cv_change();
+
+  
+
 -- 4b. updated_at
 create or replace function public.set_updated_at()
 returns trigger
@@ -248,9 +272,9 @@ create policy "candidates: delete via job"
 
 
 -- ---------------------------------------------------------------------
--- 7. (Valfritt) Realtime för kanban-tavlan
--- ---------------------------------------------------------------------
--- alter publication supabase_realtime add table public.candidates;
+-- 7. Realtime för kanban-tavlan
+ 
+ alter publication supabase_realtime add table public.candidates;
 
 
 -- ---------------------------------------------------------------------

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import AppHeader from "@/components/app-header";
+import Collapsible from "@/components/collapsible";
 import CreateJobForm from "./create-job-form";
 import DeleteJobButton from "./delete-job-button";
 
@@ -53,18 +54,19 @@ export default async function JobsPage() {
       <main className="mx-auto max-w-6xl p-4 sm:p-8 space-y-8 text-gray-900">
         <h1 className="text-2xl font-semibold">Jobb</h1>
 
-        <section className="space-y-3">
-          <h2 className="text-lg font-medium">
-            {isAdmin ? "Skapa jobb åt en kund" : "Lägg upp ett nytt jobb"}
-          </h2>
-          {isAdmin && customers?.length === 0 ? (
-            <p className="text-sm text-gray-600">
-              Det finns inga kunder än. Skapa en kund under Konton först.
-            </p>
-          ) : (
+        {/* Formuläret är öppet bara när det inte finns några jobb än; annars en knapp. */}
+        {isAdmin && customers?.length === 0 ? (
+          <p className="text-sm text-gray-600">
+            Det finns inga kunder än. Skapa en kund under Konton först.
+          </p>
+        ) : (
+          <Collapsible
+            title={isAdmin ? "Nytt jobb åt en kund" : "Nytt jobb"}
+            defaultOpen={(jobs?.length ?? 0) === 0}
+          >
             <CreateJobForm isAdmin={isAdmin} customers={customers ?? []} />
-          )}
-        </section>
+          </Collapsible>
+        )}
 
         <section className="space-y-3">
           <h2 className="text-lg font-medium">

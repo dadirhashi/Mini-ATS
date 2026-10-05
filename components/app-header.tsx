@@ -38,6 +38,9 @@ export default async function AppHeader() {
               Konton
             </Link>
           )}
+          <Link href="/account" className="text-gray-600 hover:text-gray-900">
+            Mitt konto
+          </Link>
         </nav>
 
         <div className="order-2 sm:order-3 flex items-center gap-3 text-sm">
