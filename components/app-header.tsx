@@ -26,6 +26,10 @@ export default async function AppHeader() {
           ATS
         </Link>
 
+                  <Link href="/account" className="text-gray-600 hover:text-gray-900">
+            Mitt konto
+          </Link>
+
         <nav className="order-3 sm:order-2 w-full sm:w-auto sm:mr-auto flex items-center gap-5 text-sm">
           <Link href="/jobs" className="text-gray-600 hover:text-gray-900">
             Jobb
