@@ -18,7 +18,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { STAGES, STAGE_COLORS, STAGE_LABELS, type Stage } from "@/lib/candidates";
+import { STAGES, STAGE_COLORS, STAGE_LABELS, scoreColor, type Stage } from "@/lib/candidates";
 import { moveCandidate } from "./actions";
 
 type Customer = { full_name: string; company_name: string | null } | null;
@@ -28,6 +28,7 @@ export type BoardCandidate = {
   full_name: string;
   stage: Stage;
   position: number;
+  ai_score: number | null; // AI-betyg 1–10, null om inte bedömd
   job: { id: string; title: string; customer: Customer };
 };
 
@@ -35,6 +36,9 @@ export type BoardJob = { id: string; title: string; customer: Customer };
 
 const customerName = (c: Customer) => (c ? c.company_name || c.full_name : "");
 const byPosition = (a: BoardCandidate, b: BoardCandidate) => a.position - b.position;
+// Högst betyg först; obedömda sist, i sin vanliga ordning.
+const byScore = (a: BoardCandidate, b: BoardCandidate) =>
+  (b.ai_score ?? -1) - (a.ai_score ?? -1) || byPosition(a, b);
 
 // Släpp-mål har prefix så att vi vet om kortet släpptes på en kolumn eller på
 // ett annat kort: "col:interview" eller "card:<kandidat-id>".
@@ -68,6 +72,7 @@ export default function Board({
   const [items, setItems] = useState(candidates);
   const [jobId, setJobId] = useState(initialJobId); // "" = alla jobb
   const [query, setQuery] = useState("");
+  const [sortByScore, setSortByScore] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,9 +99,9 @@ export default function Board({
   }
 
   const q = query.trim().toLowerCase();
-  const visible = items.filter(
-    (c) => (!jobId || c.job.id === jobId) && (!q || c.full_name.toLowerCase().includes(q))
-  );
+  const visible = items
+    .filter((c) => (!jobId || c.job.id === jobId) && (!q || c.full_name.toLowerCase().includes(q)))
+    .sort(sortByScore ? byScore : byPosition);
   const isFiltered = jobId !== "" || q !== "";
   const activeCard = activeId ? items.find((c) => c.id === activeId) : undefined;
 
@@ -122,8 +127,10 @@ export default function Board({
       const target = items.find((c) => c.id === overId.slice(CARD.length));
       if (!target || target.id === movingId) return;
       stage = target.stage;
-      beforeId = target.id;
+      // Sorterat på AI-betyg styr betyget ordningen, så kortet läggs bara i kolumnen.
+      beforeId = sortByScore ? null : target.id;
     }
+    if (sortByScore && moving.stage === stage) return; // ordningen styrs av betyget
 
     // 2. Räkna ut ny position: mitt emellan grannarna. Då behöver inga andra
     //    kort numreras om – bara det flyttade kortet sparas.
@@ -189,6 +196,16 @@ export default function Board({
           aria-label="Sök på kandidatnamn"
           className="w-56 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
         />
+
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={sortByScore}
+            onChange={(e) => setSortByScore(e.target.checked)}
+            className="h-4 w-4"
+          />
+          Sortera på AI-betyg
+        </label>
 
         {isFiltered && (
           <>
@@ -321,7 +338,17 @@ function CardBody({
         dragging ? "shadow-lg rotate-2 cursor-grabbing" : "shadow-sm"
       }`}
     >
-      <p className="font-medium leading-tight">{c.full_name}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-medium leading-tight">{c.full_name}</p>
+        {c.ai_score != null && (
+          <span
+            title="AI-matchning mot jobbet"
+            className={`shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${scoreColor(c.ai_score)}`}
+          >
+            {c.ai_score}/10
+          </span>
+        )}
+      </div>
       <Link
         href={`/jobs/${c.job.id}`}
         className="block text-xs text-gray-500 hover:underline truncate"

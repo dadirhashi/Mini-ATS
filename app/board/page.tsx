@@ -17,7 +17,7 @@ export default async function BoardPage({
   const { data: candidates, error } = await supabase
     .from("candidates")
     .select(
-      "id, full_name, stage, position, job:jobs!inner(id, title, customer:profiles!jobs_customer_id_fkey(full_name, company_name))"
+       "id, full_name, stage, position, ai_score:ai_assessment->score, job:jobs!inner(id, title, customer:profiles!jobs_customer_id_fkey(full_name, company_name))"
     )
     .order("position", { ascending: true })
     .overrideTypes<BoardCandidate[], { merge: false }>();
