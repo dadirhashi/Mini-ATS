@@ -63,3 +63,35 @@ export async function deleteCandidate(formData: FormData) {
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/jobs");
 }
+
+
+export type AssessState = { error?: string; success?: string } | undefined;
+
+// Ber Edge Function assess-cv att AI-bedöma kandidatens CV mot jobbet.
+// Funktionen kontrollerar själv att användaren har åtkomst till kandidaten.
+export async function assessCandidate(
+  _prev: AssessState,
+  formData: FormData
+): Promise<AssessState> {
+  const id = String(formData.get("id") ?? "");
+  const jobId = String(formData.get("job_id") ?? "");
+  if (!id) return { error: "Kandidat saknas." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.functions.invoke("assess-cv", {
+    body: { candidate_id: id },
+  });
+
+  if (error) {
+    let message = "Kunde inte göra AI-bedömningen.";
+    try {
+      const body = await error.context.json();
+      if (body?.error) message = body.error;
+    } catch {}
+    return { error: message };
+  }
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath("/board");
+  return { success: `Klar: ${data.score}/10` };
+}
