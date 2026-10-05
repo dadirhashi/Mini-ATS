@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AppHeader from "@/components/app-header";
+import Collapsible from "@/components/collapsible";
 import CreateUserForm from "./create-user-form";
 
 export default async function AdminUsersPage() {
@@ -22,10 +23,10 @@ export default async function AdminUsersPage() {
       <main className="mx-auto max-w-6xl p-4 sm:p-8 space-y-8 text-gray-900">
         <h1 className="text-2xl font-semibold">Konton</h1>
 
-        <section className="space-y-3">
-          <h2 className="text-lg font-medium">Skapa nytt konto</h2>
+        {/* Öppen från början bara när admin är ensam; annars en knapp. */}
+        <Collapsible title="Skapa nytt konto" defaultOpen={(profiles?.length ?? 0) <= 1}>
           <CreateUserForm />
-        </section>
+        </Collapsible>
 
         <section className="space-y-3">
           <h2 className="text-lg font-medium">Alla konton ({profiles?.length ?? 0})</h2>
