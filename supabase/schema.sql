@@ -272,9 +272,9 @@ create policy "candidates: delete via job"
 
 
 -- ---------------------------------------------------------------------
--- 7. (Valfritt) Realtime för kanban-tavlan
--- ---------------------------------------------------------------------
--- alter publication supabase_realtime add table public.candidates;
+-- 7. Realtime för kanban-tavlan
+ 
+ alter publication supabase_realtime add table public.candidates;
 
 
 -- ---------------------------------------------------------------------
