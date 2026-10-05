@@ -12,6 +12,8 @@ import {
 import CreateCandidateForm from "./create-candidate-form";
 import DeleteCandidateButton from "./delete-candidate-button";
 import AssessButton from "./assess-button";
+import EditJobForm from "./edit-job-form";
+import EditCandidateForm from "./edit-candidate-form";
 
 type JobDetail = {
   id: string;
@@ -107,6 +109,8 @@ export default async function JobDetailPage({
             </p>
           )}
         </div>
+
+        <EditJobForm job={job} />
 
         <section className="space-y-3">
           <h2 className="text-lg font-medium">Lägg till kandidat</h2>
@@ -212,6 +216,8 @@ export default async function JobDetailPage({
                       </p>
                     </div>
                   )}
+
+                  <EditCandidateForm candidate={c} jobId={job.id} />
 
                   <AssessButton
                     id={c.id}
