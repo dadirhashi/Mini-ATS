@@ -139,7 +139,23 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
+-- 4b. updated_at
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql set search_path = ''
+as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
 
+create trigger profiles_updated_at   before update on public.profiles
+  for each row execute function public.set_updated_at();
+create trigger jobs_updated_at       before update on public.jobs
+  for each row execute function public.set_updated_at();
+create trigger candidates_updated_at before update on public.candidates
+  for each row execute function public.set_updated_at();
 
 -- 4c. Nollställ AI-bedömningen när CV-texten ändras, så att ett gammalt betyg
 --     aldrig visas för ett nytt CV. Körs bara när cv_text finns med i UPDATE
@@ -160,27 +176,6 @@ $$;
 create trigger candidates_reset_ai_on_cv_change
   before update of cv_text on public.candidates
   for each row execute function public.reset_ai_assessment_on_cv_change();
-
-  
-
--- 4b. updated_at
-create or replace function public.set_updated_at()
-returns trigger
-language plpgsql set search_path = ''
-as $$
-begin
-  new.updated_at := now();
-  return new;
-end;
-$$;
-
-create trigger profiles_updated_at   before update on public.profiles
-  for each row execute function public.set_updated_at();
-create trigger jobs_updated_at       before update on public.jobs
-  for each row execute function public.set_updated_at();
-create trigger candidates_updated_at before update on public.candidates
-  for each row execute function public.set_updated_at();
-
 
 -- ---------------------------------------------------------------------
 -- 5. Rättigheter (tabell- och kolumnnivå)
@@ -273,8 +268,8 @@ create policy "candidates: delete via job"
 
 -- ---------------------------------------------------------------------
 -- 7. Realtime för kanban-tavlan
- 
- alter publication supabase_realtime add table public.candidates;
+-- ---------------------------------------------------------------------
+alter publication supabase_realtime add table public.candidates;
 
 
 -- ---------------------------------------------------------------------
