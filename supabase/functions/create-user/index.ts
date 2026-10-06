@@ -72,7 +72,8 @@ Deno.serve(async (req) => {
   if (!fullName) return json({ error: "Namn krävs." }, 400);
   if (!ROLES.includes(role)) return json({ error: "Ogiltig roll." }, 400);
 
-  // 4. Skapa kontot. Triggern handle_new_user skapar profilen automatiskt.
+
+    // 4. Skapa kontot. Triggern handle_new_user skapar profilen automatiskt.
   const { data, error } = await admin.auth.admin.createUser({
     email,
     password,
@@ -87,5 +88,22 @@ Deno.serve(async (req) => {
     return json({ error: message }, status);
   }
 
+  // 5. Sätt rollen på profilen. Supabase Auth sparar app_metadata först efter
+  //    att användaren skapats, så triggern ser ingen roll och sätter "customer".
+  //    Rollen sätts därför här, med service role, från samma validerade värde.
+  const { error: roleError } = await admin
+    .from("profiles")
+    .update({ role })
+    .eq("id", data.user.id);
+
+  if (roleError) {
+    console.error("Kunde inte sätta roll:", roleError.message);
+    // Lämna inget halvfärdigt konto efter sig.
+    await admin.auth.admin.deleteUser(data.user.id);
+    return json({ error: "Kunde inte skapa kontot." }, 500);
+  }
+
   return json({ id: data.user.id, email, role }, 201);
 });
+
+ 
